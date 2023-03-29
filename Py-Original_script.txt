@@ -1,0 +1,167 @@
+import pandas as pd
+
+#Get the data from the local path as input
+census = pd.read_csv("/kaggle/input/healthcare/census_2011.csv")
+
+#Have a look on first 5 rows of census data
+census.head()
+
+#To find the number of records, fields in the dataset
+census.shape
+
+#To check all he column names of the dataset
+list(census.columns)
+census.columns
+
+---------------#### **Problem Statement 1: (Keep the relevant data)**
+#Keeping only required fields from the entire dataset.
+new_census = census[['State name', 'District name', 'Population', 'Male', 'Female', 'Literate', 'Male_Literate','Female_Literate', 
+        'Rural_Households', 'Urban_Households', 'Households','Age_Group_0_29', 'Age_Group_30_49', 'Age_Group_50', 
+        'Age not stated']]
+
+#new_census.head()
+list(new_census.columns)
+
+#Renaming the column names
+new_census = new_census.set_axis(["State/UT", "District", "Population","Male","Female","Literate","Literate_Male",
+                     "Literate_Female","Households_Rural","Households_Urban","Households","Young_and_Adult",
+                     "Middle_Aged","Senior_Citizen","Age_Not_Stated"],axis=1)
+#Display the column names of new_census data
+#new_census.columns
+
+---------------#### **Problem Statement 3: Rename State/UT Names**
+#Converting the State/UT names to uppercase 
+new_census['State/UT'] = new_census['State/UT'].str.title()
+#new_census['State/UT']
+#Getting the distinct state names from the State/UT column
+new_census['State/UT'].unique()
+
+-----------------#### **Problem Statement 4: (New State/UT formation)**
+#### **Telangana.txt File**
+---------------------### **Telangana.txt File**-----------------------------------------
+
+#reading the txt file as pandas dataframe \
+#Giving the header name as Satte Name
+District_data = pd.read_csv("/kaggle/input/healthcare/Telangana.txt", sep=" ", 
+                             header=None, names=["District"])
+
+#Display the data
+District_data
+
+#changing the pandas settings to display full dataset
+pd.set_option('display.max_rows', None)
+pd.set_option('display.max_columns', None)
+pd.set_option('display.width', None)
+pd.set_option('display.max_colwidth', -1)
+#view entire dataset
+#display(new_census)
+
+#### **4.1 Read the text file and Rename the State/UT From “Andhra Pradesh” to “Telangana”**
+#Updating the vlaues of State/UT col
+District_data["State/UT"]="Telangana"
+#District_data #[10,2][District,State/UT]
+
+#Joining dataframes based on District column 
+merge_data = pd.merge(new_census,District_data, on="District",how="left")
+merge_data.columns
+
+#Filling column vlaues of State/UT_y with vlaues of State/UT_x
+merge_data['State/UT_y']=merge_data['State/UT_y'].fillna(merge_data['State/UT_x'])
+
+#Excluding the column State/UT_x form the dataframe 
+merge=merge_data.loc[:, merge_data.columns !='State/UT_x']
+merge.loc[531:533]
+
+#shifting the position of a column 'State/UT_y' from last to first
+temp_cols = merge.columns.tolist()
+new_cols=temp_cols[-1:] +temp_cols[:-1]
+updated_census=merge[new_cols]
+updated_census.head(2)
+
+#Renaming the column name
+updated_census = updated_census.rename(columns={'State/UT_y': 'State/UT'})
+updated_census.shape, new_census.shape
+
+#### **4.2 Rename the State/UT From “Jammu and Kashmir” to “Laddakh” for Leh(Ladakh) and Kargil districts** 
+updated_census["State/UT"] = updated_census.apply(lambda x: "Laddakh"
+                                                  if x["District"]=="Leh(Ladakh)"
+                                                  else x["State/UT"], axis=1, )
+updated_census["State/UT"] = updated_census.apply(lambda x: "Laddakh"
+                                                  if x["District"]=="Kargil"
+                                                  else x["State/UT"], axis=1, )
+updated_census.head(5)
+
+----------------#### **Problem Statement 5: (Find and process Missing Data)**-----------------------------
+#updated_census.isnull().mean().round(4).mul(100).sort_values(ascending=False)
+missing_data = pd.DataFrame(updated_census.isnull().mean().round(4).mul(100).sort_values(ascending=True), columns=['Percentage Missing'])     
+missing_data
+
+#Cehcking the sum of missing values from each column , 0 -no missing values
+updated_census.isna().sum()
+
+#Make a copy of updated_census
+new_census = updated_census.copy()
+new_census.head(10)
+
+#check in which row the variable has missing values
+#print(updated_census['Population'].isnull()) , #updated_census[['Population', 'Male', 'Female']] 
+updated_census['Male']=updated_census['Male'].fillna(updated_census['Population']-updated_census['Female'])
+updated_census['Female']=updated_census['Female'].fillna(updated_census['Population']-updated_census['Male'])
+updated_census['Population']=updated_census['Population'].fillna(updated_census['Male']-updated_census['Female'])
+updated_census[['Population','Male','Female']]
+#updated_census.isna().sum()
+updated_census[updated_census['Population'].isnull()]
+updated_census[updated_census['Male'].isnull()]
+
+#Literate = Literate_Male + Literate_Female
+updated_census[['Literate','Literate_Male','Literate_Female']]
+updated_census['Literate']=updated_census['Literate'].fillna(updated_census['Literate_Male']-updated_census['Literate_Female'])
+updated_census['Literate_Male']=updated_census['Literate_Male'].fillna(updated_census['Literate']-updated_census['Literate_Female'])
+updated_census['Literate_Female']=updated_census['Literate_Female'].fillna(updated_census['Literate']-updated_census['Literate_Male'])
+updated_census[['Literate','Literate_Male','Literate_Female']]
+updated_census.isna().sum()
+updated_census[updated_census['Literate'].isnull()] 
+#Rows 329, 568 - there are two missing values 
+#literate -> %missofLiterate-%missingofLiterate_Female(5.62-4.22 = 1.4),[missing_val of Lierate=1194891,Literate_Female=841547 ] 
+#Literate_Female ->5.62-4.84 = 0.78 [miss_val of Literate=359365,miss_val of Literate_Male=101360]
+
+
+updated_census['Young_and_Adult']=updated_census['Young_and_Adult'].fillna(updated_census['Population']-
+                                                                            (updated_census['Middle_Aged'] + 
+                                                                             updated_census['Senior_Citizen']+updated_census['Age_Not_Stated']))
+
+updated_census['Middle_Aged']=updated_census['Middle_Aged'].fillna(updated_census['Population']-
+                                                                            (updated_census['Young_and_Adult'] + 
+                                                                             updated_census['Senior_Citizen']+updated_census['Age_Not_Stated']))
+
+updated_census['Senior_Citizen']=updated_census['Senior_Citizen'].fillna(updated_census['Population']-
+                                                                            (updated_census['Young_and_Adult'] + 
+                                                                             updated_census['Middle_Aged']+updated_census['Age_Not_Stated']))
+updated_census['Age_Not_Stated']=updated_census['Age_Not_Stated'].fillna(updated_census['Population']-
+                                                                            (updated_census['Young_and_Adult'] + 
+                                                                             updated_census['Middle_Aged']+updated_census['Senior_Citizen']))
+
+#updated_census[['Population','Young_and_Adult','Middle_Aged','Senior_Citizen', 'Age_Not_Stated']]
+
+
+
+#Households = Households_Rural + Households_Urban
+updated_census['Households']= updated_census['Households'].fillna(updated_census['Households_Rural']-updated_census['Households_Urban'])
+updated_census['Households_Rural']= updated_census['Households_Rural'].fillna(updated_census['Households']-updated_census['Households_Urban'])
+updated_census['Households_Urban']= updated_census['Households_Urban'].fillna(updated_census['Households']-updated_census['Households_Rural'])
+updated_census[['Households','Households_Rural','Households_Urban']]
+
+updated_census[updated_census['Households'].isnull()] 
+
+#### **Comparing the missing values before and after imputation**
+ new_census.isna().sum(), updated_census.isna().sum()
+
+#### **Create a visualization that compares the amount of missing data before and after the data-filling process**
+#new_census.plot.hist(), updated_census.plot.hist()
+#fig, axes = plt.subplots(1, 2)
+from matplotlib import pyplot as plt
+new_census.isnull().sum().plot(kind='bar');updated_census.isnull().sum().plot(kind='bar')
+--------------------------
+#### **Problem Statement 6: (Save Data)**
+#Saving the cleaned data of updated_census data as 'census.csv' file
+
